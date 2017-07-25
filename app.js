@@ -6,12 +6,41 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var debug = require('debug')('base-app:server');
 var http = require('http');
+var config = require('./config');
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var Promise = require('bluebird');
+Promise.promisifyAll(mongoose);
 
 var index = require('./routes/index');
 var users = require('./routes/users');
 
 var app = express();
 var server = http.createServer(app);
+
+
+app.all('/', function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "X-Requested-With");
+    next();
+});
+
+// Connect to MongoDB
+var options = { promiseLibrary: require('bluebird') }; // TODO:: put this options in config;
+mongoose.createConnection(config.mongo.uri, options);
+mongoose.connection.on('error', function (err) {
+    console.error('MongoDB connection error: ' + err);
+    process.exit(-1);
+});
+
+mongoose.connect(config.mongo.uri, { promiseLibrary: require('bluebird'),useMongoClient: true })
+    .then(function(){console.log('MongoDB connection established' )})
+    .catch(function(err){
+      console.error('MongoDB connection error: ' + err);
+      process.exit(-1);
+    });
+
 /**
  * Get port from environment and store in Express.
  */
@@ -32,24 +61,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', index);
 app.use('/users', users);
-
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  var err = new Error('Not Found');
-  err.status = 404;
-  next(err);
-});
-
-// error handler
-app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-  // render the error page
-  res.status(err.status || 500);
-  res.render('error');
-});
 
 /**
  * Normalize a port into a number, string, or false.
@@ -113,9 +124,57 @@ function onListening() {
 }
 
 /**
- * Listen on provided port, on all network interfaces.
+ * environment
  */
 
-server.listen(port);
-server.on('error', onError);
-server.on('listening', onListening);
+ if (app.get('env') === 'development') {
+    app.use(function(err, req, res, next) {
+      res.status(err.status || 500);
+      res.render('error', {
+        message: err.message,
+        error: err
+      });
+    });
+  } else if(app.get('env') === 'production'){
+    app.use(function(err, req, res, next) {
+      res.status(err.status || 500);
+      res.render('error', {
+        message: err.message,
+        error: {}
+      });
+    });
+  }
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+console.log("IP:"+ config.port, "PORT:"+ config.ip, "CONSOLING IP AND PORT HERE....");
+
+function startServer() {
+  server.listen(config.port, config.ip);
+  server.on('error', onError);
+  server.on('listening', onListening);
+}
+// this function is called when you want the server to die gracefully
+// i.e. wait for existing connections
+var gracefulShutdown = function () {
+    console.log("Received kill signal, shutting down gracefully.");
+    server.close(function () {
+        console.log("Closed out remaining connections.");
+        process.exit();
+    });
+
+    // if after
+    setTimeout(function () {
+        console.error("Could not close connections in time, forcefully shutting down");
+        process.exit();
+    }, 10 * 1000);
+};
+
+// listen for TERM signal .e.g. kill
+process.on('SIGTERM', gracefulShutdown);
+
+// listen for INT signal e.g. Ctrl-C
+process.on('SIGINT', gracefulShutdown);
+
+startServer();
