@@ -8,11 +8,6 @@ var debug = require('debug')('base-app:server');
 var http = require('http');
 var config = require('./config');
 
-var mongoose = require('mongoose');
-var Schema = mongoose.Schema;
-var Promise = require('bluebird');
-Promise.promisifyAll(mongoose);
-
 var index = require('./routes/index');
 var users = require('./routes/users');
 
@@ -25,13 +20,6 @@ app.all('/', function(req, res, next) {
     res.header("Access-Control-Allow-Headers", "X-Requested-With");
     next();
 });
-
-mongoose.createConnection(config.mongo.uri, { promiseLibrary: require('bluebird'),useMongoClient: true })
-    .then(function(){console.log('MongoDB connection established' )})
-    .catch(function(err){
-      console.error('MongoDB connection error: ' + err);
-      process.exit(-1);
-    });
 
 /**
  * Get port from environment and store in Express.
