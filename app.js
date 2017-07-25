@@ -26,15 +26,7 @@ app.all('/', function(req, res, next) {
     next();
 });
 
-// Connect to MongoDB
-var options = { promiseLibrary: require('bluebird') }; // TODO:: put this options in config;
-mongoose.createConnection(config.mongo.uri, options);
-mongoose.connection.on('error', function (err) {
-    console.error('MongoDB connection error: ' + err);
-    process.exit(-1);
-});
-
-mongoose.connect(config.mongo.uri, { promiseLibrary: require('bluebird'),useMongoClient: true })
+mongoose.createConnection(config.mongo.uri, { promiseLibrary: require('bluebird'),useMongoClient: true })
     .then(function(){console.log('MongoDB connection established' )})
     .catch(function(err){
       console.error('MongoDB connection error: ' + err);
